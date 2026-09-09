@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'core/discovery/device_info.dart';
+import 'core/discovery/udp_lan_discovery_service.dart';
+
 void main() {
   runApp(const ReTiDeCoApp());
 }
@@ -21,63 +24,159 @@ class ReTiDeCoApp extends StatelessWidget {
   }
 }
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
+
+  @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _discovery = UdpLanDiscoveryService();
+  final _devices = <DeviceInfo>[];
+  bool _discovering = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _discovery.devices.listen((devices) {
+      if (!mounted) return;
+      setState(() {
+        _devices
+          ..clear()
+          ..addAll(devices);
+      });
+    });
+    _startDiscovery();
+  }
+
+  Future<void> _startDiscovery() async {
+    setState(() {
+      _discovering = true;
+      _error = null;
+    });
+    try {
+      await _discovery.start();
+    } catch (error) {
+      if (mounted) setState(() => _error = 'LAN discovery failed: $error');
+    } finally {
+      if (mounted) setState(() => _discovering = false);
+    }
+  }
+
+  Future<void> _refresh() async {
+    setState(() => _discovering = true);
+    try {
+      await _discovery.refresh();
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Refresh failed: $error');
+    } finally {
+      if (mounted) setState(() => _discovering = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _discovery.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('ReTiDeCo')),
+      appBar: AppBar(
+        title: const Text('ReTiDeCo'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh nearby devices',
+            onPressed: _discovering ? null : _refresh,
+            icon: const Icon(Icons.refresh_rounded),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 520),
-          child: Padding(
+          constraints: const BoxConstraints(maxWidth: 680),
+          child: ListView(
             padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.devices_rounded, size: 72),
-                const SizedBox(height: 24),
-                Text(
-                  'Real-Time Device Communication',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'Connect devices on the same local network and share screen or audio in real time.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _showComingSoon(context, 'Start Server'),
-                    icon: const Icon(Icons.cast_rounded),
-                    label: const Text('Start Server'),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _showComingSoon(context, 'Connect to Device'),
-                    icon: const Icon(Icons.link_rounded),
-                    label: const Text('Connect to Device'),
-                  ),
-                ),
+            children: [
+              const Icon(Icons.devices_rounded, size: 64),
+              const SizedBox(height: 16),
+              Text(
+                'Nearby Devices',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _discovering
+                    ? 'Discovering devices on your local network…'
+                    : 'Devices found on the same LAN appear here automatically.',
+                textAlign: TextAlign.center,
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 16),
+                Text(_error!, textAlign: TextAlign.center),
               ],
-            ),
+              const SizedBox(height: 24),
+              if (_devices.isEmpty && !_discovering)
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      children: [
+                        const Icon(Icons.wifi_find_rounded, size: 48),
+                        const SizedBox(height: 12),
+                        Text(
+                          'No ReTiDeCo devices found',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Make sure another ReTiDeCo device is running on the same Wi-Fi or LAN.',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              else
+                ..._devices.map(_deviceCard),
+            ],
           ),
         ),
       ),
     );
   }
 
-  void _showComingSoon(BuildContext context, String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('$action will be implemented in the next milestone.')),
+  Widget _deviceCard(DeviceInfo device) {
+    final platformLabel = switch (device.platform) {
+      DevicePlatform.windows => 'Windows',
+      DevicePlatform.android => 'Android',
+      DevicePlatform.ios => 'iOS',
+      DevicePlatform.macos => 'macOS',
+      DevicePlatform.linux => 'Linux',
+      DevicePlatform.unknown => 'Unknown platform',
+    };
+    final sharingLabel = switch (device.sharingMode) {
+      SharingMode.none => 'Not sharing',
+      SharingMode.screen => 'Screen sharing',
+      SharingMode.audio => 'Audio sharing',
+      SharingMode.screenAndAudio => 'Screen + audio',
+    };
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: ListTile(
+        leading: CircleAvatar(child: Icon(device.isHost ? Icons.cast : Icons.devices)),
+        title: Text(device.name),
+        subtitle: Text('$platformLabel • $sharingLabel'),
+        trailing: FilledButton(
+          onPressed: device.isHost ? () {} : null,
+          child: const Text('Connect'),
+        ),
+      ),
     );
   }
 }
