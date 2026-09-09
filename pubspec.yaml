@@ -1,0 +1,24 @@
+name: retideco
+description: Real-time peer-to-peer device communication over a local network.
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+
+# Networking, WebRTC and platform integrations will be added incrementally
+# after the cross-platform application shell is validated.
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
