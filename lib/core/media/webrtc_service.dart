@@ -13,7 +13,7 @@ class WebRtcService {
 
   Future<void> initialize() => WebRTC.initialize();
 
-  Future<void> createPeerConnection() async {
+  Future<void> _ensurePeerConnection() async {
     if (_peerConnection != null) return;
     await initialize();
     _peerConnection = await createPeerConnection({
@@ -43,14 +43,14 @@ class WebRtcService {
   }
 
   Future<void> addLocalTracks(MediaStream stream) async {
-    await createPeerConnection();
+    await _ensurePeerConnection();
     for (final track in stream.getTracks()) {
       await _peerConnection!.addTrack(track, stream);
     }
   }
 
   Future<RTCSessionDescription> createOffer() async {
-    await createPeerConnection();
+    await _ensurePeerConnection();
     final offer = await _peerConnection!.createOffer({
       'offerToReceiveAudio': true,
       'offerToReceiveVideo': true,
@@ -60,7 +60,7 @@ class WebRtcService {
   }
 
   Future<RTCSessionDescription> createAnswer() async {
-    await createPeerConnection();
+    await _ensurePeerConnection();
     final answer = await _peerConnection!.createAnswer({
       'offerToReceiveAudio': true,
       'offerToReceiveVideo': true,
@@ -70,12 +70,12 @@ class WebRtcService {
   }
 
   Future<void> setRemoteDescription(RTCSessionDescription description) async {
-    await createPeerConnection();
+    await _ensurePeerConnection();
     await _peerConnection!.setRemoteDescription(description);
   }
 
   Future<void> addIceCandidate(RTCIceCandidate candidate) async {
-    await createPeerConnection();
+    await _ensurePeerConnection();
     await _peerConnection!.addCandidate(candidate);
   }
 
