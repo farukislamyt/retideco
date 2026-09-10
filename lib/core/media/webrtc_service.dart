@@ -1,6 +1,5 @@
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import '../discovery/device_info.dart';
 import 'media_session.dart';
 
 /// Owns the WebRTC peer connection lifecycle. Signaling remains transport-agnostic
@@ -12,12 +11,11 @@ class WebRtcService {
   RTCPeerConnection? get peerConnection => _peerConnection;
   MediaStream? get localStream => _localStream;
 
-  Future<void> initialize() async {
-    await Helper.ensureInitialized();
-  }
+  Future<void> initialize() => WebRTC.initialize();
 
   Future<void> createPeerConnection() async {
     if (_peerConnection != null) return;
+    await initialize();
     _peerConnection = await createPeerConnection({
       'iceServers': <Map<String, dynamic>>[],
       'sdpSemantics': 'unified-plan',
@@ -26,15 +24,16 @@ class WebRtcService {
 
   Future<MediaStream> captureScreen({bool withAudio = false}) async {
     await initialize();
-    final constraints = <String, dynamic>{
+    _localStream = await navigator.mediaDevices.getDisplayMedia({
       'video': true,
       'audio': withAudio,
-    };
-    _localStream = await navigator.mediaDevices.getDisplayMedia(constraints);
+    });
     return _localStream!;
   }
 
-  Future<MediaStream> captureAudio() async {
+  /// Captures microphone input. System-loopback capture is platform-specific
+  /// and is intentionally not mislabeled as microphone capture here.
+  Future<MediaStream> captureMicrophone() async {
     await initialize();
     _localStream = await navigator.mediaDevices.getUserMedia({
       'audio': true,
