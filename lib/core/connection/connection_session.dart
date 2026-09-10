@@ -1,4 +1,4 @@
-import 'device_info.dart';
+import '../discovery/device_info.dart';
 
 enum SessionState { idle, connecting, pendingApproval, connected, rejected, failed, closed }
 
