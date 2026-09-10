@@ -69,6 +69,7 @@ class ConnectionService {
     final completer = Completer<SessionChannel>();
     late StreamSubscription<String> subscription;
     subscription = socket
+        .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
@@ -128,6 +129,7 @@ class ConnectionService {
   void _handleSocket(Socket socket) {
     late StreamSubscription<String> subscription;
     subscription = socket
+        .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
