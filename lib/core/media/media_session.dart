@@ -1,15 +1,22 @@
-enum MediaSessionState { idle, negotiating, active, stopped, failed }
+import '../discovery/device_info.dart';
 
-enum MediaKind { screen, audio }
+enum MediaSessionState { idle, preparing, negotiating, publishing, receiving, active, stopped, failed }
 
 class MediaSession {
-  MediaSession({required this.kinds});
+  MediaSession({
+    required this.sessionId,
+    required this.mode,
+    required this.isPublisher,
+    this.state = MediaSessionState.idle,
+  });
 
-  final Set<MediaKind> kinds;
-  MediaSessionState state = MediaSessionState.idle;
+  final String sessionId;
+  final SharingMode mode;
+  final bool isPublisher;
+  MediaSessionState state;
 
-  bool get hasScreen => kinds.contains(MediaKind.screen);
-  bool get hasAudio => kinds.contains(MediaKind.audio);
+  bool get hasVideo => mode == SharingMode.screen || mode == SharingMode.screenAndAudio;
+  bool get hasAudio => mode == SharingMode.audio || mode == SharingMode.screenAndAudio;
 
   void setState(MediaSessionState next) => state = next;
 }
