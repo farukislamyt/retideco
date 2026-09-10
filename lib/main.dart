@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'core/connection/connection_service.dart';
+import 'core/device/local_device.dart';
 import 'core/discovery/device_info.dart';
 import 'core/discovery/udp_lan_discovery_service.dart';
+import 'features/host/host_page.dart';
 
 void main() {
   runApp(const ReTiDeCoApp());
@@ -33,6 +36,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _discovery = UdpLanDiscoveryService();
+  final _connection = ConnectionService();
   final _devices = <DeviceInfo>[];
   bool _discovering = false;
   String? _error;
@@ -76,9 +80,28 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _connect(DeviceInfo device) async {
+    try {
+      await _connection.requestConnection(
+        device: device,
+        localDeviceId: LocalDevice.id,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connected to ${device.name}.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Connection failed: $error')),
+      );
+    }
+  }
+
   @override
   void dispose() {
     _discovery.dispose();
+    _connection.dispose();
     super.dispose();
   }
 
@@ -103,17 +126,22 @@ class _HomePageState extends State<HomePage> {
             children: [
               const Icon(Icons.devices_rounded, size: 64),
               const SizedBox(height: 16),
-              Text(
-                'Nearby Devices',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
+              Text('Nearby Devices', textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineSmall),
               const SizedBox(height: 8),
               Text(
                 _discovering
                     ? 'Discovering devices on your local network…'
                     : 'Devices found on the same LAN appear here automatically.',
                 textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const HostPage()),
+                ),
+                icon: const Icon(Icons.cast_rounded),
+                label: const Text('Start Server'),
               ),
               if (_error != null) ...[
                 const SizedBox(height: 16),
@@ -128,10 +156,8 @@ class _HomePageState extends State<HomePage> {
                       children: [
                         const Icon(Icons.wifi_find_rounded, size: 48),
                         const SizedBox(height: 12),
-                        Text(
-                          'No ReTiDeCo devices found',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
+                        Text('No ReTiDeCo devices found',
+                            style: Theme.of(context).textTheme.titleMedium),
                         const SizedBox(height: 8),
                         const Text(
                           'Make sure another ReTiDeCo device is running on the same Wi-Fi or LAN.',
@@ -172,10 +198,9 @@ class _HomePageState extends State<HomePage> {
         leading: CircleAvatar(child: Icon(device.isHost ? Icons.cast : Icons.devices)),
         title: Text(device.name),
         subtitle: Text('$platformLabel • $sharingLabel'),
-        trailing: FilledButton(
-          onPressed: device.isHost ? () {} : null,
-          child: const Text('Connect'),
-        ),
+        trailing: device.isHost
+            ? FilledButton(onPressed: () => _connect(device), child: const Text('Connect'))
+            : null,
       ),
     );
   }
