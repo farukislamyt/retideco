@@ -34,27 +34,37 @@ The first milestone targets **Windows ↔ Android**:
 - **Native platform APIs** for screen and system-audio capture where required.
 - **WebRTC** for low-latency peer media transport.
 
-Discovery and connection negotiation are intentionally separate from media transport. A discovered device is never trusted automatically.
+Discovery, connection negotiation, and media transport are separate layers. A discovered device is never trusted automatically.
 
 ## Current status
 
-🚧 **v0.2.0 — LAN discovery + connection foundation**
+🚧 **v0.3.0 — WebRTC media foundation**
 
 Implemented:
 
 - Nearby-device discovery over UDP broadcast.
 - Host/server advertisement and heartbeat.
-- Host sharing-mode selection.
 - Connection request/accept/reject flow.
 - Session IDs and protocol versioning.
-- Cross-platform media-capture abstraction.
-- Initial unit tests for discovery/connection protocol models.
+- WebRTC peer-connection foundation.
+- Screen-capture API integration through `getDisplayMedia`.
+- Microphone capture through `getUserMedia`.
+- SDP offer/answer and ICE signaling message definitions.
+- Media session lifecycle model.
 
-Next: authenticated session security, WebRTC negotiation, and native screen/audio capture.
+Still required before calling streaming production-ready:
+
+- Live signaling over the connection socket.
+- Receiver video renderer/UI.
+- Android MediaProjection/background handling.
+- Windows system-audio loopback integration.
+- Screen/audio synchronization and adaptive bitrate.
+- Real Windows ↔ Android device testing.
 
 ## Protocol documentation
 
 - [LAN Discovery Protocol](docs/lan-discovery-protocol.md)
+- [WebRTC Media Architecture](docs/webrtc-media-architecture.md)
 
 ## License
 
