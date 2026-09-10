@@ -5,6 +5,7 @@ import 'dart:math';
 
 import '../discovery/device_info.dart';
 import 'connection_protocol.dart';
+import 'session_channel.dart';
 
 class PendingConnection {
   PendingConnection({
@@ -25,13 +26,13 @@ class ConnectionService {
 
   final int port;
   final _pendingController = StreamController<PendingConnection>.broadcast();
-  final _connectionController = StreamController<Socket>.broadcast();
+  final _connectionController = StreamController<SessionChannel>.broadcast();
   final _random = Random.secure();
 
   ServerSocket? _server;
 
   Stream<PendingConnection> get pendingConnections => _pendingController.stream;
-  Stream<Socket> get connections => _connectionController.stream;
+  Stream<SessionChannel> get connections => _connectionController.stream;
   bool get isRunning => _server != null;
 
   Future<int> start() async {
@@ -44,7 +45,7 @@ class ConnectionService {
   String createSessionId() =>
       '${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}-${_random.nextInt(1 << 32).toRadixString(36)}';
 
-  Future<Socket> requestConnection({
+  Future<SessionChannel> requestConnection({
     required DeviceInfo device,
     required String localDeviceId,
     Duration timeout = const Duration(seconds: 8),
@@ -63,7 +64,7 @@ class ConnectionService {
     )));
     await socket.flush();
 
-    final completer = Completer<Socket>();
+    final completer = Completer<SessionChannel>();
     late StreamSubscription<String> subscription;
     subscription = socket
         .transform(utf8.decoder)
@@ -74,9 +75,11 @@ class ConnectionService {
         if (message is! Map<String, dynamic> || message['sessionId'] != sessionId) return;
         if (message['type'] != 'connection_response') return;
         if (message['accepted'] == true && !completer.isCompleted) {
-          completer.complete(socket);
+          completer.complete(SessionChannel.fromSocket(socket));
         } else if (message['accepted'] == false && !completer.isCompleted) {
-          completer.completeError(StateError(message['reason'] ?? 'Connection rejected'));
+          completer.completeError(
+            StateError(message['reason']?.toString() ?? 'Connection rejected'),
+          );
         }
       } catch (_) {
         if (!completer.isCompleted) {
@@ -97,13 +100,15 @@ class ConnectionService {
     }
   }
 
-  Future<void> approve(PendingConnection pending) async {
+  Future<SessionChannel> approve(PendingConnection pending) async {
     pending.socket.write(encodeMessage(approvalMessage(
       sessionId: pending.sessionId,
       accepted: true,
     )));
     await pending.socket.flush();
-    _connectionController.add(pending.socket);
+    final channel = SessionChannel.fromSocket(pending.socket);
+    _connectionController.add(channel);
+    return channel;
   }
 
   Future<void> reject(PendingConnection pending, {String reason = 'Rejected by host'}) async {
@@ -117,46 +122,38 @@ class ConnectionService {
   }
 
   void _handleSocket(Socket socket) {
-    final buffer = StringBuffer();
-    late StreamSubscription<List<int>> subscription;
-    subscription = socket.listen((data) {
-      buffer.write(utf8.decode(data, allowMalformed: false));
-      final text = buffer.toString();
-      final lines = text.split('\n');
-      buffer.clear();
-      buffer.write(lines.removeLast());
-      for (final line in lines) {
-        if (line.trim().isEmpty) continue;
-        try {
-          final message = jsonDecode(line);
-          if (message is! Map<String, dynamic> ||
-              message['protocol'] != connectionProtocol ||
-              message['version'] != connectionProtocolVersion ||
-              message['type'] != 'connection_request') {
-            socket.destroy();
-            return;
-          }
-          final sessionId = message['sessionId'] as String?;
-          final deviceId = message['deviceId'] as String?;
-          final deviceName = message['deviceName'] as String?;
-          if (sessionId == null || deviceId == null || deviceName == null) {
-            socket.destroy();
-            return;
-          }
-          _pendingController.add(PendingConnection(
-            sessionId: sessionId,
-            deviceId: deviceId,
-            deviceName: deviceName,
-            socket: socket,
-          ));
-          subscription.pause();
-          return;
-        } catch (_) {
+    final subscription = socket
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .listen((line) {
+      if (line.trim().isEmpty) return;
+      try {
+        final message = jsonDecode(line);
+        if (message is! Map<String, dynamic> ||
+            message['protocol'] != connectionProtocol ||
+            message['version'] != connectionProtocolVersion ||
+            message['type'] != 'connection_request') {
           socket.destroy();
           return;
         }
+        final sessionId = message['sessionId'] as String?;
+        final deviceId = message['deviceId'] as String?;
+        final deviceName = message['deviceName'] as String?;
+        if (sessionId == null || deviceId == null || deviceName == null) {
+          socket.destroy();
+          return;
+        }
+        _pendingController.add(PendingConnection(
+          sessionId: sessionId,
+          deviceId: deviceId,
+          deviceName: deviceName,
+          socket: socket,
+        ));
+        subscription.pause();
+      } catch (_) {
+        socket.destroy();
       }
-    }, onError: (_) => socket.destroy(), onDone: () {});
+    }, onError: (_) => socket.destroy());
   }
 
   Future<void> stop() async {
