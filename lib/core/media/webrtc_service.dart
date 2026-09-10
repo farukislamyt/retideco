@@ -13,6 +13,8 @@ class WebRtcService {
 
   Future<void> initialize() => WebRTC.initialize();
 
+  Future<void> preparePeerConnection() => _ensurePeerConnection();
+
   Future<void> _ensurePeerConnection() async {
     if (_peerConnection != null) return;
     await initialize();
