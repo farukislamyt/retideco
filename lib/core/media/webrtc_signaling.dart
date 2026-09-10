@@ -32,15 +32,7 @@ class WebRtcSignaling {
   Future<void> startPublisher(MediaSession session, MediaStream localStream) async {
     await _webRtc.addLocalTracks(localStream);
     final pc = _webRtc.peerConnection!;
-    pc.onIceCandidate = (candidate) {
-      unawaited(channel.send(iceCandidateMessage(
-        sessionId: session.sessionId,
-        candidate: candidate.candidate ?? '',
-        sdpMid: candidate.sdpMid,
-        sdpMLineIndex: candidate.sdpMLineIndex,
-      )));
-    };
-    pc.onConnectionState = (state) => _stateController.add(state);
+    _configurePeerConnection(pc, session.sessionId);
     _listen(session.sessionId);
     session.setState(MediaSessionState.negotiating);
     final offer = await _webRtc.createOffer();
@@ -52,28 +44,27 @@ class WebRtcSignaling {
   }
 
   Future<void> startReceiver(MediaSession session) async {
-    await _webRtc.initialize();
-    final pc = _webRtc.peerConnection;
-    if (pc == null) {
-      // createPeerConnection is initialized lazily by the first media action.
-      await _webRtc.createOffer();
-    }
-    final receiver = _webRtc.peerConnection!;
-    receiver.onIceCandidate = (candidate) {
+    await _webRtc.preparePeerConnection();
+    final pc = _webRtc.peerConnection!;
+    _configurePeerConnection(pc, session.sessionId);
+    _listen(session.sessionId);
+    session.setState(MediaSessionState.receiving);
+  }
+
+  void _configurePeerConnection(RTCPeerConnection pc, String sessionId) {
+    pc.onIceCandidate = (candidate) {
       unawaited(channel.send(iceCandidateMessage(
-        sessionId: session.sessionId,
+        sessionId: sessionId,
         candidate: candidate.candidate ?? '',
         sdpMid: candidate.sdpMid,
         sdpMLineIndex: candidate.sdpMLineIndex,
       )));
     };
-    receiver.onTrack = (event) {
+    pc.onTrack = (event) {
       final stream = event.streams.isNotEmpty ? event.streams.first : null;
       if (stream != null) _remoteStreamController.add(stream);
     };
-    receiver.onConnectionState = (state) => _stateController.add(state);
-    _listen(session.sessionId);
-    session.setState(MediaSessionState.receiving);
+    pc.onConnectionState = (state) => _stateController.add(state);
   }
 
   void _listen(String sessionId) {
@@ -88,7 +79,10 @@ class WebRtcSignaling {
             _remoteDescriptionSet = true;
             await _flushCandidates();
             final answer = await _webRtc.createAnswer();
-            await channel.send(mediaAnswerMessage(sessionId: sessionId, sdp: answer.sdp ?? ''));
+            await channel.send(mediaAnswerMessage(
+              sessionId: sessionId,
+              sdp: answer.sdp ?? '',
+            ));
             break;
           case 'media_answer':
             final sdp = message['sdp'] as String?;
