@@ -13,12 +13,14 @@ class PendingConnection {
     required this.deviceId,
     required this.deviceName,
     required this.socket,
+    required this.subscription,
   });
 
   final String sessionId;
   final String deviceId;
   final String deviceName;
   final Socket socket;
+  final StreamSubscription<String> subscription;
 }
 
 class ConnectionService {
@@ -106,6 +108,7 @@ class ConnectionService {
       accepted: true,
     )));
     await pending.socket.flush();
+    await pending.subscription.cancel();
     final channel = SessionChannel.fromSocket(pending.socket);
     _connectionController.add(channel);
     return channel;
@@ -118,11 +121,13 @@ class ConnectionService {
       reason: reason,
     )));
     await pending.socket.flush();
+    await pending.subscription.cancel();
     pending.socket.destroy();
   }
 
   void _handleSocket(Socket socket) {
-    final subscription = socket
+    late StreamSubscription<String> subscription;
+    subscription = socket
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen((line) {
@@ -148,6 +153,7 @@ class ConnectionService {
           deviceId: deviceId,
           deviceName: deviceName,
           socket: socket,
+          subscription: subscription,
         ));
         subscription.pause();
       } catch (_) {
