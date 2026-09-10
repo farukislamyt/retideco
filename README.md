@@ -26,18 +26,35 @@ The first milestone targets **Windows ↔ Android**:
 6. Audio-only streaming.
 7. Screen + audio streaming.
 
-## Architecture direction
+## Architecture
 
 - **Flutter** for the shared application UI and cross-platform application layer.
+- **UDP LAN discovery** for zero-configuration device discovery during the MVP.
+- **TCP session negotiation** for connection requests and explicit host approval.
 - **Native platform APIs** for screen and system-audio capture where required.
 - **WebRTC** for low-latency peer media transport.
-- **mDNS / local-network discovery** for zero-configuration device discovery.
 
-Platform-specific capture capabilities will be implemented behind small native interfaces so the core application remains portable.
+Discovery and connection negotiation are intentionally separate from media transport. A discovered device is never trusted automatically.
 
-## Project status
+## Current status
 
-🚧 Early development — architecture and MVP foundation.
+🚧 **v0.2.0 — LAN discovery + connection foundation**
+
+Implemented:
+
+- Nearby-device discovery over UDP broadcast.
+- Host/server advertisement and heartbeat.
+- Host sharing-mode selection.
+- Connection request/accept/reject flow.
+- Session IDs and protocol versioning.
+- Cross-platform media-capture abstraction.
+- Initial unit tests for discovery/connection protocol models.
+
+Next: authenticated session security, WebRTC negotiation, and native screen/audio capture.
+
+## Protocol documentation
+
+- [LAN Discovery Protocol](docs/lan-discovery-protocol.md)
 
 ## License
 
