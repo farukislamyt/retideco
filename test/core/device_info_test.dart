@@ -3,14 +3,14 @@ import 'package:retideco/core/discovery/device_info.dart';
 
 void main() {
   test('device info serializes and restores discovery metadata', () {
-    const original = DeviceInfo(
+    final original = DeviceInfo(
       id: 'device-1',
       name: 'Office PC',
       platform: DevicePlatform.windows,
       port: 45822,
       isHost: true,
       sharingMode: SharingMode.screenAndAudio,
-      lastSeen: null,
+      lastSeen: DateTime.now(),
     );
 
     final restored = DeviceInfo.fromJson(original.toJson(), address: '192.168.1.20');
