@@ -9,6 +9,7 @@ import 'dart:io';
 class SessionChannel {
   SessionChannel._(this.socket) {
     _subscription = socket
+        .cast<List<int>>()
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .listen(_handleLine, onError: _handleError, onDone: _handleDone);
