@@ -49,11 +49,12 @@ class ConnectionService {
     required String localDeviceId,
     Duration timeout = const Duration(seconds: 8),
   }) async {
-    final socket = await Socket.connect(
-      device.address,
-      device.port,
-      timeout: timeout,
-    );
+    final address = device.address;
+    if (address == null || address.isEmpty || device.port <= 0) {
+      throw ArgumentError('The discovered device has no usable connection endpoint.');
+    }
+
+    final socket = await Socket.connect(address, device.port, timeout: timeout);
     final sessionId = createSessionId();
     socket.write(encodeMessage(connectionRequestMessage(
       sessionId: sessionId,
@@ -78,7 +79,9 @@ class ConnectionService {
           completer.completeError(StateError(message['reason'] ?? 'Connection rejected'));
         }
       } catch (_) {
-        if (!completer.isCompleted) completer.completeError(const FormatException('Invalid response'));
+        if (!completer.isCompleted) {
+          completer.completeError(const FormatException('Invalid connection response'));
+        }
       }
     }, onError: (Object error, StackTrace stack) {
       if (!completer.isCompleted) completer.completeError(error, stack);
@@ -86,9 +89,11 @@ class ConnectionService {
 
     try {
       return await completer.future.timeout(timeout);
+    } catch (_) {
+      socket.destroy();
+      rethrow;
     } finally {
       await subscription.cancel();
-      if (completer.isCompleted && !completer.future.isCompleted) socket.destroy();
     }
   }
 
@@ -145,8 +150,10 @@ class ConnectionService {
             socket: socket,
           ));
           subscription.pause();
+          return;
         } catch (_) {
           socket.destroy();
+          return;
         }
       }
     }, onError: (_) => socket.destroy(), onDone: () {});
