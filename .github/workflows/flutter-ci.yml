@@ -22,8 +22,10 @@ jobs:
           channel: stable
           cache: true
 
+      # The repository intentionally keeps platform scaffolding lightweight;
+      # generate it in CI without creating Flutter's sample widget test.
       - name: Generate platform projects
-        run: flutter create --platforms=android,windows .
+        run: flutter create --platforms=android,windows --no-test --no-pub .
 
       - name: Get dependencies
         run: flutter pub get
